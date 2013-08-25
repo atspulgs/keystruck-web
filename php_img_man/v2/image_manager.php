@@ -1,7 +1,7 @@
 <?php
 /* -------------------------------------------------------------------------------------------------------------
 * Author:       Atspulgs
-* Version:      0.2 Alpha
+* Version:      0.3 Alpha
 * Webpage:      
 * -------------->>
 * Changelog:
@@ -11,17 +11,27 @@
 * 						- When declaring checks if the file is legit otherwise throws a custom Exception.
 * - 24/08/2013 	- 0.2 A	- Did a small bug fix. Still No real life tests done.
 *						- Added a basic logger option (may still be improved)
-* 						- Added some getters
+* 						- Added some getters.
 * 						- Added a function for saving the resource to a file.
+* - 24/08/2013	- 0.3 A - Added resize functions.
+*						- Added an option to reuse the original.
+* 						- Can obtain the original as well ass modified versions of the image.
+* 						- Modified log messages.
+*						- Added basic border function.
 * -------------->>
 * Todo:
-* - Create image resizer keeping aspect ratio using either width or height
-* - Create resize function that will keep the aspect ratio and crop image while centring it.
-* - Create a function that will put a border of the chosen color around the image. Border size could have some variation.
+* - Add Radiant option to the border function. (dont think ill go any further than 2 colors)
 * - Add config file
 * - Configurable logger types
 * - Make logger more Object Oriented.
-* - Add extension checks - extension_loaded
+* - Add extension checks - extension_loaded.
+* - Gives the option to add a string to the image (http://php.net/manual/en/function.imagestring.php).
+* - Optional object construction using image string or resource.
+* - Cleanup.
+* - Image export to string (http://stackoverflow.com/questions/8502610/how-to-create-a-base64encoded-string-from-image-resource) 
+* 		with optional base64 encode (http://php.net/manual/en/function.base64-encode.php).
+* - Rotation with options to zoom in or crop the image. (need to test avilable rotation functions)
+* - Add drop shadow function. (http://www.codewalkers.com/c/a/Miscellaneous/Adding-Drop-Shadows-with-PHP/6/)
 * -------------->>
 * Features:
 * - Checks if the file exists.
@@ -36,6 +46,10 @@
 * - Save the image in the specified filetype.(Original file type = 0, gif = 1, jpg = 2, png = 3) Based on IMAGETYPE variables.
 *		If a filename contains a supported image type extension, will use that overriding type alltogether.
 * - Optional logger available, Formats with tab size of 7 (works well with notepad)
+* - Resize functions added. This includes, resize forcing the new size, resize on either width or height keeping original
+* 		aspect ratio, resize both height and width keeping original aspect ratio with the help of crop and center options.
+* - Resize to fit a rectangle, keeps the aspect ratio and checks whcih side should be used for resizing based on input width and height.
+* - Can add a simple color border of chosen width around the image. (still impure look, will try to improve)
 * -------------->>
 * Exception Codes:
 * -> 1001 - File couldnt be found, assumed as non existant.
@@ -46,6 +60,9 @@
 * -> 1006 - Filetype extension didnt match after reading file header.
 * -> 1007 - imagetype didnt match any of the supported filetypes.
 * -> 1008 - One of the imagecreatefrom* functions failed.
+* -> 1009 - Final image creation failed (imagecopyresampled/imagecopymerge failed).
+* -> 1010 - Variable was expected to be gretaer than 0.
+* -> 1011 - Imagecolorallocate failed.
 * -------------->>
 * Image Type Id list
 * 1 - gif
@@ -60,9 +77,16 @@ final class ImgManager
 
 	//Properties
 	private $src;
+	private $srcWidth;
+	private $srcHeight;
+	private $srcAspect;
 	private $filetype;
 	private $extension;
 	private $imgtype;
+	private $trgt;
+	private $width;
+	private $height;
+	private $aspect;
 
 	//For internal use mostly
 	private $log;
@@ -74,8 +98,12 @@ final class ImgManager
 			$this->log = $log;
 		}
 		$this->src = $this->creategd($strsrc);
+		$this->trgt = $this->src;
+		$this->srcWidth = $this->width = imagesx($this->src);
+		$this->srcHeight = $this->height = imagesy($this->src);
+		$this->srcAspect = $this->aspect = $this->srcWidth / $this->srcHeight;
 		if(empty($this->src)) throw new ImgManagerException("Failed at creating gd resource!", 1008);
-		else if($this->log) $this->logger->logit("Image was created successfully from the file.\r\n\t\t\t\t\t\tOriginal File: ".$strsrc."\r\n\t\t\t\t\t\tFile Type: ".$this->filetype, "File Loaded: ");
+		else if($this->log) $this->logger->logit("Original File: ".$strsrc.", File Type: ".$this->filetype, "Image Loaded: ");
 	}
 
 	private function creategd($file){
@@ -111,16 +139,95 @@ final class ImgManager
 		}
 	}
 
+	//Resize function with options to keep the aspect and center the image if aspect is to be kept. Centring can be done in H || V .
+	private function resize_crop_center($width, $height, $crop=false, $centredH=false, $centredV=false){
+		if($width <= 0 && $height > 0)
+			$width = round($height * $this->aspect);
+		elseif($height <=0)
+			$height = round($width / $this->aspect);
+		$aspect = $width / $height;
+		$target = imagecreatetruecolor($width, $height);
+		$cWidth = $width;
+		$cHeight = $height;
+
+		if($crop) {
+			$cWidth = $this->aspect >= $aspect? $this->width / ($this->height / $height) : $width;
+			$cHeight = $this->aspect >= $aspect? $height : $this->height / ($this->width / $width);
+		}
+
+		$dst_x = $centredH? (0 - (($cWidth - $width) / 2)) : 0;
+		$dst_y = $centredV? (0 - (($cHeight - $height) / 2)) : 0;
+
+		if(!imagecopyresampled($target, $this->trgt, $dst_x, $dst_y, 0, 0, round($cWidth), round($cHeight),$this->width, $this->height))
+			throw new ImgManagerException("imagecopyresampled was unsuccessful!", 1009);
+		$this->trgt = $target;
+		$this->width = imagesx($target);
+		$this->height = imagesy($target);
+		$this->aspect = $this->width/$this->height;
+	}
+
 	//Ill be using javadoc style later
 
+	public function getOriginal() { return $this->src; }
 	//return the image resource
-	public function getResource() { return $this->src; }
+	public function getResource() { return $this->trgt; }
 	//return the file type of the assumed image
 	public function getFileType() { return $this->filetype; }
 	//return the extension of the file
 	public function getExt() { return $this->extension; }
 	//return the image type as a number *see the imagetype table
 	public function getImgType() { return $this->imgtype; }
+	//basic resize function. Simply squizes or stretches the image.
+	public function resize($width, $height) {
+		$this->resize_crop_center($width, $height);
+		if($this->log) $this->logger->logit("Image was resized to (".$width.",".$height.").", "Image Resize: ");
+		return $this;
+	}
+	//resizes the image, crops if needed and centers if cropped.
+	public function rcc($width, $height) {
+		$this->resize_crop_center($width, $height, true, true, true);
+		if($this->log) $this->logger->logit("Image was resized to (".$width.",".$height.") cropped to keep the aspect and centred.", "Image Resize: ");
+		return $this;
+	}
+	//resize on width
+	public function ronx($width) {
+		if($width <=0) throw new ImgManagerException("Width can not be smaller than or equal to 0!", 1010);
+		$this->resize_crop_center($width, 0);
+		if($this->log) $this->logger->logit("Image was resized on width(".$width.") keeping aspect ratio.", "Image Resize: ");
+		return $this;
+	}
+	//resize on height
+	public function rony($height) {
+		if($height <=0) throw new ImgManagerException("Height can not be smaller than or equal to 0!", 1010);
+		$this->resize_crop_center(0, $height);
+		if($this->log) $this->logger->logit("Image was resized on height(".$height.") keeping aspect ratio.", "Image Resize: ");
+		return $this;
+	}
+	//resizes in a way so the image keeps it aspect and also fits within a rectangle specified(does not crop)
+	public function fitin($width, $height) {
+		if($this->aspect >= $width / $height)
+			$this->ronx($width);
+		else $this->rony($height);
+		return $this;
+	}
+	//Adds a basic border around the image.
+	public function border($color, $width = 1) {
+		$w = $this->width+(2*$width);
+		$h = $this->height+(2*$width);
+		$target = imagecreatetruecolor($w, $h);
+		$col = ImgManager::hextorgb($color);
+		$color = imagecolorallocate($target, $col['red'], $col['green'], $col['blue']);
+		if($color === false) throw new ImgManagerException("Failed to set a color!", 1011);
+		imagefilledrectangle($target, 0, 0, $w, $h, $color);
+		if(!imagecopymerge($target, $this->trgt, $width, $width, 0, 0,$this->width, $this->height, 100))
+			throw new ImgManagerException("imagecopymerge was unsuccessful!", 1009);
+		$this->trgt = $target;
+		$this->width = $w;
+		$this->height = $h;
+		$this->aspect = $w/$h;
+		if($this->log) $this->logger->logit("Border of color ".$color." was successfully added to the image.", "Image Color: ");
+		return $this;
+	}
 	//saves the image to the specified location and returns the location *location is returned so you can use the function straignt in the img tag(can be overwritten)
 	//default img type is jpg, but can be overwritten by a different imagetype (Imagetype variables cna be used as well as numbers)
 	public function saveImg($filename, $type = IMAGETYPE_JPEG, $rtrn = true){
@@ -142,13 +249,31 @@ final class ImgManager
 		} else if($type == 0)
 			$type = $this->imgtype;
 		switch($type){
-			case IMAGETYPE_GIF: imagegif($this->src, $filename.($ftype = ".gif")); break;
-			case IMAGETYPE_JPEG: imagejpeg($this->src, $filename.($ftype = ".jpg")); break;
-			case IMAGETYPE_PNG: imagepng($this->src, $filename.($ftype = ".png")); break;
-			default: imagejpeg($this->src, $filename.($ftype = ".jpg"));
+			case IMAGETYPE_GIF: imagegif($this->trgt, $filename.($ftype = ".gif")); break;
+			case IMAGETYPE_JPEG: imagejpeg($this->trgt, $filename.($ftype = ".jpg")); break;
+			case IMAGETYPE_PNG: imagepng($this->trgt, $filename.($ftype = ".png")); break;
+			default: imagejpeg($this->trgt, $filename.($ftype = ".jpg"));
 		}
 		if($this->log) $this->logger->logit("Image was saved successfully @ ".$filename.$ftype, "Image Saved: ");
-		if($rtrn) return $filename.$ftype; else return true;
+		if($rtrn) return $filename.$ftype; else return $this;
+	}
+
+	//Resets the target image into original image. This may be useful if you want to do more than one thing with the same image.
+	public function reset() {
+		$this->trgt = $this->src;
+		$this->height = $this->srcHeight;
+		$this->width = $this->srcWidth;
+		$this->aspect = $this->srcAspect;
+		if($this->log) $this->logger->logit("Modified image was reset to original.", "Image Reset: ");
+		return $this;
+	}
+
+	//Hex to RGB. A small extra. returns an array 0 = R, 1 = G, 2 = B OR red, green, blue
+	public static function hextorgb($hex) {
+		if($hex[0] == '#' && strlen($hex) == 7)
+			return ['red' => hexdec($hex[1].$hex[2]), 'green' => hexdec($hex[3].$hex[4]), 'blue' => hexdec($hex[5].$hex[6]),
+				hexdec($hex[1].$hex[2]), hexdec($hex[3].$hex[4]), hexdec($hex[5].$hex[6])];
+		return false;
 	}
 }
 
