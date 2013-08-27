@@ -13,18 +13,15 @@
 *						- Added a basic logger option (may still be improved)
 * 						- Added some getters.
 * 						- Added a function for saving the resource to a file.
-* - 24/08/2013	- 0.3 A - Added resize functions.
+* - 25/08/2013	- 0.3 A - Added resize functions.
 *						- Added an option to reuse the original.
 * 						- Can obtain the original as well ass modified versions of the image.
 * 						- Modified log messages.
 *						- Added basic border function.
+* - 27/08/2013	- 0.4 A - Added extension check and loading.
+* 						- Border function can now do a gradiant border using 2 colors.
 * -------------->>
 * Todo:
-* - Add Radiant option to the border function. (dont think ill go any further than 2 colors)
-* - Add config file
-* - Configurable logger types
-* - Make logger more Object Oriented.
-* - Add extension checks - extension_loaded.
 * - Gives the option to add a string to the image (http://php.net/manual/en/function.imagestring.php).
 * - Optional object construction using image string or resource.
 * - Cleanup.
@@ -50,6 +47,9 @@
 * 		aspect ratio, resize both height and width keeping original aspect ratio with the help of crop and center options.
 * - Resize to fit a rectangle, keeps the aspect ratio and checks whcih side should be used for resizing based on input width and height.
 * - Can add a simple color border of chosen width around the image. (still impure look, will try to improve)
+* - Checks if extensions are loaded.
+* - Attempts to load the extensions it needs.
+* - gradiant option for border added.(still needs some refining.)
 * -------------->>
 * Exception Codes:
 * -> 1001 - File couldnt be found, assumed as non existant.
@@ -63,6 +63,7 @@
 * -> 1009 - Final image creation failed (imagecopyresampled/imagecopymerge failed).
 * -> 1010 - Variable was expected to be gretaer than 0.
 * -> 1011 - Imagecolorallocate failed.
+* -> 1012 - Failed to load a library.
 * -------------->>
 * Image Type Id list
 * 1 - gif
@@ -93,6 +94,7 @@ final class ImgManager
 	private $logger;
 
 	public function __construct($strsrc, $log = false){
+		$this->checkExctensions();
 		if($log) {
 			$this->logger = new ImgManagerLogger();
 			$this->log = $log;
@@ -127,6 +129,20 @@ final class ImgManager
 			case IMAGETYPE_PNG: return imagecreatefrompng($file);
 			default: throw new ImgManagerException("Imagetype didnt match the possible source creation methods!", 1007);
 		}
+	}
+
+	private function checkExctensions() {
+		$suffix = PHP_SHLIB_SUFFIX;
+		$prefix = ($suffix === 'dll') ? 'php_' : '';
+		if(!extension_loaded("gd"))
+    		if(dl($prefix.'gd.'.$suffix))
+    			throw new ImgManagerException("GD library was not loaded and the attempt to load it failed!", 1012);
+		if(!extension_loaded("fileinfo"))
+    		if(dl($prefix.'fileinfo.'.$suffix))
+    			throw new ImgManagerException("FileInfo library was not loaded and the attempt to load it failed!", 1012);
+		if(!extension_loaded("exif"))
+    		if(dl($prefix .'exif.'.$suffix))
+    			throw new ImgManagerException("Exif library was not loaded and the attempt to load it failed!", 1012);
 	}
 
 	private function extMatch($mimetype, $extension){
@@ -211,14 +227,31 @@ final class ImgManager
 		return $this;
 	}
 	//Adds a basic border around the image.
-	public function border($color, $width = 1) {
+	public function border($color, $width = 1, $color2 = false) {
 		$w = $this->width+(2*$width);
 		$h = $this->height+(2*$width);
+		$ca = array();
+		$colors = array();
 		$target = imagecreatetruecolor($w, $h);
 		$col = ImgManager::hextorgb($color);
 		$color = imagecolorallocate($target, $col['red'], $col['green'], $col['blue']);
 		if($color === false) throw new ImgManagerException("Failed to set a color!", 1011);
+		if($color2) {
+			$col2 = ImgManager::hextorgb($color2);
+			$c1int = ($col['red'] - $col2['red'])/($width-1);
+			$c2int = ($col['green'] - $col2['green'])/($width-1);
+			$c3int = ($col['blue'] - $col2['blue'])/($width-1);
+			for($i=0;$i<$width-1;$i++) {
+				$ca[$i] = array('red' => $col['red'] - ($c1int*($i+1)),
+								'green' => $col['green'] - ($c2int*($i+1)),
+								'blue' => $col['blue'] - ($c3int*($i+1)));
+				$colors[$i] = imagecolorallocate($target, round($ca[$i]['red']), round($ca[$i]['green']), round($ca[$i]['blue']));
+			}
+		}
 		imagefilledrectangle($target, 0, 0, $w, $h, $color);
+		if($color2)
+			for($i=0;$i<$width-1;$i++)
+				imagefilledrectangle($target, ($i+1), ($i+1), $w-(($i+1)), $h-(($i+1)), $colors[$i]);
 		if(!imagecopymerge($target, $this->trgt, $width, $width, 0, 0,$this->width, $this->height, 100))
 			throw new ImgManagerException("imagecopymerge was unsuccessful!", 1009);
 		$this->trgt = $target;
