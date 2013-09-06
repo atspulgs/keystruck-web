@@ -227,37 +227,42 @@ final class ImgManager
 		return $this;
 	}
 	//Adds a basic border around the image.
-	public function border($color, $width = 1, $color2 = false) {
-		$w = $this->width+(2*$width);
-		$h = $this->height+(2*$width);
-		$ca = array();
-		$colors = array();
-		$target = imagecreatetruecolor($w, $h);
-		$col = ImgManager::hextorgb($color);
-		$color = imagecolorallocate($target, $col['red'], $col['green'], $col['blue']);
+	public function border($color, $size = 1, $color2 = false) {
 		if($color === false) throw new ImgManagerException("Failed to set a color!", 1011);
-		if($color2) {
-			$col2 = ImgManager::hextorgb($color2);
-			$c1int = ($col['red'] - $col2['red'])/($width-1);
-			$c2int = ($col['green'] - $col2['green'])/($width-1);
-			$c3int = ($col['blue'] - $col2['blue'])/($width-1);
-			for($i=0;$i<$width-1;$i++) {
-				$ca[$i] = array('red' => $col['red'] - ($c1int*($i+1)),
-								'green' => $col['green'] - ($c2int*($i+1)),
-								'blue' => $col['blue'] - ($c3int*($i+1)));
-				$colors[$i] = imagecolorallocate($target, round($ca[$i]['red']), round($ca[$i]['green']), round($ca[$i]['blue']));
+		if($size == 0) return $this;
+
+		$width = $this->width + ($size*2);
+		$height = $this->height + ($size*2);
+		$target = imagecreatetruecolor($width, $height);
+		$colors = [ImgManager::hextorgb($color)];
+		$color_int_values = array();
+		if($color2 && $size > 1){
+			$colors[$size-1] = ImgManager::hextorgb($color2);
+			if($size > 2){
+				$diff_red = ($colors[0]['red'] - $colors[$size-1]['red'])/($size-1);
+				$diff_green = ($colors[0]['green'] - $colors[$size-1]['green'])/($size-1);
+				$diff_blue = ($colors[0]['blue'] - $colors[$size-1]['blue'])/($size-1);
+				for($i=1;$i<$size-1;$i++)
+					$colors[$i] = ['red' => intval(round($colors[0]['red'] - ($diff_red*$i))),
+						'green' => intval(round($colors[0]['green'] - ($diff_green*$i))),
+						'blue' => intval(round($colors[0]['blue'] - ($diff_blue*$i))),
+						intval(round($colors[0]['red'] - ($diff_red*$i))),
+						intval(round($colors[0]['green'] - ($diff_green*$i))),
+						intval(round($colors[0]['blue'] - ($diff_blue*$i)))];
 			}
 		}
-		imagefilledrectangle($target, 0, 0, $w, $h, $color);
-		if($color2)
-			for($i=0;$i<$width-1;$i++)
-				imagefilledrectangle($target, ($i+1), ($i+1), $w-(($i+1)), $h-(($i+1)), $colors[$i]);
-		if(!imagecopymerge($target, $this->trgt, $width, $width, 0, 0,$this->width, $this->height, 100))
+		ksort($colors);
+		foreach($colors as $c)
+			$color_int_values[] = imagecolorallocate($target, $c['red'], $c['green'], $c['blue']);
+
+		for($i=0,$j=0;$i <$size;$i+=1,$j++)
+			imagefilledrectangle($target, $i, $i, $width-$i-1, $height-$i-1, $color_int_values[$j]);
+		if(!imagecopymerge($target, $this->trgt, $size, $size, 0, 0,$this->width, $this->height, 100))
 			throw new ImgManagerException("imagecopymerge was unsuccessful!", 1009);
 		$this->trgt = $target;
-		$this->width = $w;
-		$this->height = $h;
-		$this->aspect = $w/$h;
+		$this->width = $width;
+		$this->height = $height;
+		$this->aspect = $width/$height;
 		if($this->log) $this->logger->logit("Border of color ".$color." was successfully added to the image.", "Image Color: ");
 		return $this;
 	}
@@ -300,7 +305,6 @@ final class ImgManager
 		if($this->log) $this->logger->logit("Modified image was reset to original.", "Image Reset: ");
 		return $this;
 	}
-
 	//Hex to RGB. A small extra. returns an array 0 = R, 1 = G, 2 = B OR red, green, blue
 	public static function hextorgb($hex) {
 		if($hex[0] == '#' && strlen($hex) == 7)
