@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<meta charset="UTF-8"> 
+<html>
+	<head>
+		<style type="text/css">
+			#container {
+				position: absolute;
+				top: 10px;
+				bottom: 10px;
+				left: 10px;
+				right: 10px;
+			}
+			#movable {
+				min-height: 100px;
+				min-width: 100px;
+				max-height: 400px;
+				max-width: 400px;
+				border: 1px solid black;
+				position: absolute;
+				top: 100px;
+				left: 100px;
+			}
+			#display {
+				position: fixed;
+				bottom: 10px;
+				right: 10px;
+				height: 500px;
+				width: 250px;
+				border: 1px solid silver;
+				background-color: rgba(240,240,240,0.2);
+			}
+			#innerMovable {
+				position: absolute;
+				top:50px;
+				left:50px;
+				width: 10px;
+				height: 10px;
+				background-color: rgba(255,0,0,0.5);
+				display: none;
+				z-index: 9;
+			}
+		</style>
+		<script type="text/javascript">
+			window.onload = function(){
+				var container = document.querySelector("#container");
+				var movable = document.querySelector("#movable");
+				var display = document.querySelector("#display");
+				var inMove = document.querySelector("#innerMovable");
+
+				var clicked = false;
+				var whatsClicked = 0;
+				var where = null;
+				var topright;
+				var bottomright;
+				var bottomleft;
+				
+				
+				var style = window.getComputedStyle(movable);
+				var minWidth = style.getPropertyValue('min-width').replace("px","");
+				var minHeight = style.getPropertyValue('min-height').replace("px","");
+				var maxWidth = style.getPropertyValue('max-width').replace("px","");
+				var maxHeight = style.getPropertyValue('max-height').replace("px","");
+
+				document.addEventListener("mousemove", onMove);
+				movable.addEventListener("mousedown", onDown);
+				document.addEventListener("mouseup", onUp);
+
+				function onDown(e) {
+					clicked = true;
+					var ex = elementOffset(movable).x;
+					var ey = elementOffset(movable).y;
+					var ecx = e.clientX-ex;
+					var ecy = e.clientY-ey;
+					where = {
+						x: ecx,
+						y: ecy
+					};
+					bottomright = {
+						x: movable.offsetLeft+movable.clientWidth,
+						y: movable.offsetTop+movable.clientHeight
+					}
+				}
+
+				function onUp(e) {
+					clicked = false;
+					where = null;
+					topright = null;
+					bottomright = null;
+				}
+
+				function onMove(e) {
+					display.innerHTML = "Point: x: "+e.clientX+" y: "+e.clientY+"<br/>X: "+elementOffset(movable).x+" Y:"+elementOffset(movable).y+"<br/>Client: width: "+movable.clientWidth+" height: "+movable.clientHeight+"<br/>Clicked: "+clicked+"<br/>whatsClicked: "+whatsClicked;
+					if(e.target === movable && !clicked)
+						whatsClicked = checkresize(movable, e);
+					else if(clicked) {
+						var px = elementOffset(movable.parentElement).x;
+						var py = elementOffset(movable.parentElement).y;
+						var x = e.clientX-px;
+						var y = e.clientY-py;
+						switch(whatsClicked) {
+							case 0: ;break;
+							case 1:
+								if(bottomright.x-x > minWidth && bottomright.x-x < maxWidth) {
+									movable.style.left = (x)+"px";
+									movable.style.width = (bottomright.x-x)+"px";
+								} else if(bottomright.x-x <= minWidth) {
+									movable.style.left = (bottomright.x-minWidth)+"px";
+									movable.style.width = minWidth+"px";
+								} else if(bottomright.x-x >= maxWidth) {
+									movable.style.left = (bottomright.x-maxWidth)+"px";
+									movable.style.width = maxWidth+"px";
+								} break;
+							case 2: 
+								if(bottomright.x-x > minWidth && bottomright.x-x < maxWidth) {
+									movable.style.left = (x)+"px";
+									movable.style.width = (bottomright.x-x)+"px";
+								} else if(bottomright.x-x <= minWidth) {
+									movable.style.left = (bottomright.x-minWidth)+"px";
+									movable.style.width = minWidth+"px";
+								} else if(bottomright.x-x >= maxWidth) {
+									movable.style.left = (bottomright.x-maxWidth)+"px";
+									movable.style.width = maxWidth+"px";
+								}
+								if(bottomright.y-y > minHeight && bottomright.y-y < maxHeight) {
+									movable.style.top = y+"px";
+									movable.style.height = (bottomright.y-y)+"px";
+								} else if(bottomright.y-y <= minHeight) {
+									movable.style.top = (bottomright.y-minHeight)+"px";
+									movable.style.height = minHeight+"px";
+								} else if(bottomright.y-y >= maxHeight) {
+									movable.style.top = (bottomright.y-maxWidth)+"px";
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 3:
+								if(bottomright.y-y > minHeight && bottomright.y-y < maxHeight) {
+									movable.style.top = y+"px";
+									movable.style.height = (bottomright.y-y)+"px";
+								} else if(bottomright.y-y <= minHeight) {
+									movable.style.top = (bottomright.y-minHeight)+"px";
+									movable.style.height = minHeight+"px";
+								} else if(bottomright.y-y >= maxHeight) {
+									movable.style.top = (bottomright.y-maxWidth)+"px";
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 4: 
+								if(x-movable.offsetLeft > minWidth && x-movable.offsetLeft < maxWidth) {
+									movable.style.width = (x-movable.offsetLeft)+"px";
+								} else if(x-movable.offsetLeft <= minWidth) {
+									movable.style.width = minWidth+"px";
+								} else if(x-movable.offsetLeft >= maxWidth) {
+									movable.style.width = maxWidth+"px";
+								}
+								if(bottomright.y-y > minHeight && bottomright.y-y < maxHeight) {
+									movable.style.top = y+"px";
+									movable.style.height = (bottomright.y-y)+"px";
+								} else if(bottomright.y-y <= minHeight) {
+									movable.style.top = (bottomright.y-minHeight)+"px";
+									movable.style.height = minHeight+"px";
+								} else if(bottomright.y-y >= maxHeight) {
+									movable.style.top = (bottomright.y-maxWidth)+"px";
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 5:
+								if(x-movable.offsetLeft > minWidth && x-movable.offsetLeft < maxWidth) {
+									movable.style.width = (x-movable.offsetLeft)+"px";
+								} else if(x-movable.offsetLeft <= minWidth) {
+									movable.style.width = minWidth+"px";
+								} else if(x-movable.offsetLeft >= maxWidth) {
+									movable.style.width = maxWidth+"px";
+								}
+								break;
+							case 6: 
+								if(x-movable.offsetLeft > minWidth && x-movable.offsetLeft < maxWidth) {
+									movable.style.width = (x-movable.offsetLeft)+"px";
+								} else if(x-movable.offsetLeft <= minWidth) {
+									movable.style.width = minWidth+"px";
+								} else if(x-movable.offsetLeft >= maxWidth) {
+									movable.style.width = maxWidth+"px";
+								}
+								if(y-movable.offsetTop > minHeight && y-movable.offsetTop < maxHeight) {
+									movable.style.height = (y-movable.offsetTop)+"px";
+								} else if(y-movable.offsetTop <= minHeight) {
+									movable.style.height = minHeight+"px";
+								} else if(y-movable.offsetTop >= maxHeight) {
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 7: 
+								if(y-movable.offsetTop > minHeight && y-movable.offsetTop < maxHeight) {
+									movable.style.height = (y-movable.offsetTop)+"px";
+								} else if(y-movable.offsetTop <= minHeight) {
+									movable.style.height = minHeight+"px";
+								} else if(y-movable.offsetTop >= maxHeight) {
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 8: 
+								if(bottomright.x-x > minWidth && bottomright.x-x < maxWidth) {
+									movable.style.left = (x)+"px";
+									movable.style.width = (bottomright.x-x)+"px";
+								} else if(bottomright.x-x <= minWidth) {
+									movable.style.left = (bottomright.x-minWidth)+"px";
+									movable.style.width = minWidth+"px";
+								} else if(bottomright.x-x >= maxWidth) {
+									movable.style.left = (bottomright.x-maxWidth)+"px";
+									movable.style.width = maxWidth+"px";
+								}
+								if(y-movable.offsetTop > minHeight && y-movable.offsetTop < maxHeight) {
+									movable.style.height = (y-movable.offsetTop)+"px";
+								} else if(y-movable.offsetTop <= minHeight) {
+									movable.style.height = minHeight+"px";
+								} else if(y-movable.offsetTop >= maxHeight) {
+									movable.style.height = maxHeight+"px";
+								}
+								break;
+							case 9: 
+								movable.style.left = (Math.min(Math.max(0,x-where.x),container.clientWidth-movable.clientWidth))+"px";
+								movable.style.top = (Math.min(Math.max(0,y-where.y),container.clientHeight-movable.clientHeight))+"px";
+								break;
+						}
+					}
+				}
+
+				/* -------------------------------------------------
+				** 0 = false
+				** 1 = west
+				** 2 = north west
+				** 3 = north
+				** 4 = north east
+				** 5 = east
+				** 6 = south east
+				** 7 = south
+				** 8 = south west
+				** 9 = move
+				** ---------------------------------------------- */
+				function checkresize(element, point) {
+					var offset = elementOffset(element);
+					if(point.clientY > (offset.y+3) && point.clientY < (element.clientHeight-3+offset.y) && point.clientX >= offset.x && point.clientX <= (offset.x+3)) {
+						element.style.cursor = "w-resize";
+						return 1;
+					} else if(point.clientY >= offset.y && point.clientX >= offset.x && point.clientY <= (offset.y+3) && point.clientX <= (offset.x+3)) {
+						element.style.cursor = "nw-resize";
+						return 2;
+					} else if(point.clientY >= offset.y && point.clientY <= (offset.y+3) && point.clientX > (offset.x+3) && point.clientX < (offset.x-3+element.clientWidth)) {
+						element.style.cursor = "n-resize";
+						return 3;
+					} else if(point.clientY >= offset.y && point.clientX >= (offset.x+element.clientWidth-3) && point.clientY <= (offset.y+3) && point.clientX <= (offset.x+element.clientWidth)) {
+						element.style.cursor = "ne-resize";
+						return 4;
+					} else if(point.clientY > (offset.y+3) && point.clientY <= (offset.y-3+element.clientHeight) && point.clientX >= (offset.x-3+element.clientWidth) && point.clientX <= (offset.x+element.clientWidth)) {
+						element.style.cursor = "e-resize";
+						return 5;
+					} else if(point.clientY >= (offset.y-3+element.clientHeight) && point.clientY <= (offset.y+element.clientHeight) && point.clientX >= (offset.x-3+element.clientWidth) && point.clientX <= (offset.x+element.clientWidth)) {
+						element.style.cursor = "se-resize";
+						return 6;
+					} else if(point.clientY >= (offset.y-3+element.clientHeight) && point.clientY <= (offset.y+element.clientHeight) && point.clientX > (offset.x+3) && point.clientX <= (offset.x+element.clientWidth-3)) {
+						element.style.cursor = "s-resize";
+						return 7;
+					} else if(point.clientY >= (offset.y-3+element.clientHeight) && point.clientY <= (offset.y+element.clientHeight) && point.clientX >= offset.x && point.clientX <= offset.x+3) {
+						element.style.cursor = "sw-resize";
+						return 8;
+					} else if(point.clientX > offset.x+3 && point.clientX < offset.x+element.clientWidth-3 && point.clientY > offset.y+3 && point.clientY < offset.y+element.clientHeight-3) {
+						element.style.cursor = "move";
+						return 9;
+					} else {
+						element.style.cursor = "default";
+						return 10;
+					}
+				}
+
+				function elementOffset(element) {
+					var top = element.offsetTop; //y
+					var left = element.offsetLeft; //x
+					var parent = element.parentElement;
+					//----
+					var x = left;
+					var y = top;
+					var p = parent;
+					while(p) {
+						x += p.offsetLeft;
+						y += p.offsetTop;
+						p = p.parentElement;
+					}
+					return {x:x,y:y};
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<div id="container">
+			<div id="movable"><div id="innerMovable"></div></div>
+		</div>
+		<div id="display">
+			
+		</div>
+	</body>
+</html>
