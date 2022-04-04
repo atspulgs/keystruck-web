@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.ibm</groupId>
+    <artifactId>ScrapRat</artifactId>
+    <version>0.0.1</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <plugin.compiler.version>3.10.0</plugin.compiler.version>
+        <plugin.compiler.source>17</plugin.compiler.source>
+        <plugin.compiler.target>17</plugin.compiler.target>
+        <plugin.jar.version>3.2.2</plugin.jar.version>
+        <plugin.jar.classPathPrefix>lib/</plugin.jar.classPathPrefix>
+    </properties>
+
+    <build>
+        <sourceDirectory>src/main/java</sourceDirectory>
+        <finalName>ScrapRat</finalName>
+        <plugins>
+            <!-- Compile -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${plugin.compiler.version}</version>
+                <configuration>
+                    <source>${plugin.compiler.source}</source>
+                    <target>${plugin.compiler.target}</target>
+                </configuration>
+            </plugin>
+            <!-- Preparing Dependencies -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-dependencies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <overWriteReleases>true</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                            <overWriteIfNewer>true</overWriteIfNewer>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Packaging -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${plugin.jar.version}</version>
+                <executions>
+                    <!-- Ignore default jar -->
+                    <execution>
+                        <id>default-jar</id>
+                        <phase>none</phase>
+                    </execution>
+                    <!-- Create API jar -->
+                    <execution>
+                        <id>api-only</id>
+                        <goals><goal>jar</goal></goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <archive>
+                                <manifestEntries>
+                                    <Build-Version>${project.version}</Build-Version>
+                                    <Build-Time>${maven.build.timestamp}</Build-Time>
+                                </manifestEntries>
+                            </archive>
+                            <classifier>api-${project.version}</classifier>
+                            <includes>
+                                <include>**/plugin/Plugin.class</include>
+                                <include>**/plugin/DataType.class</include>
+                                <include>**/plugin/DataField.class</include>
+                                <include>**/plugin/Scraper.class</include>
+                                <include>**/plugin/Reporter.class</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                    <!-- Create Executable jar -->
+                    <execution>
+                        <id>everything</id>
+                        <goals><goal>jar</goal></goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <addClasspath>true</addClasspath>
+                                    <classpathPrefix>${plugin.jar.classPathPrefix}</classpathPrefix>
+                                    <mainClass>com.ibm.ScrapRat</mainClass>
+                                </manifest>
+                                <manifestEntries>
+                                    <Build-Version>${project.version}</Build-Version>
+                                    <Build-Time>${maven.build.timestamp}</Build-Time>
+                                </manifestEntries>
+                            </archive>
+                            <classifier>${project.version}</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
